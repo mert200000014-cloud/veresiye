@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veresiye Pro – Final</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f0f2f5; margin:0; padding:20px; }
+h1 { text-align:center; margin-bottom:20px; color:#333; }
+.panel { background:#fff; padding:20px; margin-bottom:20px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1); }
+input, button { width:100%; margin:6px 0; padding:10px; border-radius:6px; border:1px solid #ccc; font-size:14px; }
+button { background:#007ACC; color:#fff; border:none; cursor:pointer; transition:0.3s; }
+button:hover { background:#005A99; }
+button.delete { background:#FF4D4F; }
+button.delete:hover { background:#D9363E; }
+button.reset { background:#FF9F00; }
+button.reset:hover { background:#D87C00; }
+table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
+th, td { padding:10px; text-align:center; }
+th { background:#007ACC; color:#fff; position:sticky; top:0; }
+tr:nth-child(even) { background:#f9f9f9; }
+tr:hover { background:#e6f2ff; }
+.flex { display:flex; flex-wrap:wrap; gap:20px; }
+.flex .panel { flex:1 1 45%; }
+.summary { display:flex; justify-content:space-around; margin-bottom:20px; flex-wrap:wrap; }
+.summary div { background:#fff; padding:15px 25px; border-radius:10px; box-shadow:0 4px 10px rgba(0,0,0,0.1); text-align:center; flex:1; margin:10px; min-width:120px; }
+.summary div h2 { margin:0; font-size:24px; color:#007ACC; }
+.summary div p { margin:5px 0 0; font-size:16px; color:#333; }
+</style>
+</head>
+<body>
+
+<h1>Veresiye Pro – Final</h1>
+
+<div class="summary">
+  <div>
+    <h2 id="gelir">0</h2>
+    <p>Toplam Gelir</p>
+    <button class="reset" onclick="resetGelir()">Reset</button>
+  </div>
+  <div>
+    <h2 id="kar">0</h2>
+    <p>Toplam Kar</p>
+    <button class="reset" onclick="resetKar()">Reset</button>
+  </div>
+  <div>
+    <h2 id="toplamBorc">0</h2>
+    <p>Toplam Borç</p>
+  </div>
+</div>
+
+<div class="flex">
+
+<div class="panel">
+<h3>Stok Girişi</h3>
+<input id="urun" placeholder="Ürün">
+<input id="alim" type="number" placeholder="Alış fiyatı">
+<input id="miktar" type="number" placeholder="Miktar">
+<button onclick="stokEkle()">Stok Ekle / Güncelle</button>
+<table id="stokTablo">
+<tr><th>Ürün</th><th>Miktar</th><th>Alış</th><th>İşlem</th></tr>
+</table>
+</div>
+
+<div class="panel">
+<h3>Satış</h3>
+<input id="sUrun" placeholder="Ürün">
+<input id="sMiktar" type="number" placeholder="Miktar">
+<input id="sFiyat" type="number" placeholder="Satış fiyatı">
+<button onclick="satisYap()">Satış Yap (Borç eklemeden)</button>
+</div>
+
+<div class="panel">
+<h3>Müşteri Yönetimi</h3>
+<input id="musteriAdi" placeholder="Müşteri Adı">
+<button onclick="addCustomer()">Müşteri Ekle</button>
+<input id="borcEkle" type="number" placeholder="Borç Ekle (+)">
+<button onclick="addDebt()">Borç Ekle</button>
+<input id="odeme" type="number" placeholder="Borç Öde (-)">
+<button onclick="payDebt()">Borç Öde</button>
+<table id="musteriTablo">
+<tr><th>Müşteri</th><th>Borç</th><th>İşlem</th></tr>
+</table>
+</div>
+
+</div>
+
+<script>
+const DB = {
+  stok: JSON.parse(localStorage.getItem("stok")) || {},
+  musteriler: JSON.parse(localStorage.getItem("musteriler")) || {},
+  gelir: Number(localStorage.getItem("gelir")) || 0,
+  kar: Number(localStorage.getItem("kar")) || 0
+};
+
+function kaydet(){
+  localStorage.setItem("stok", JSON.stringify(DB.stok));
+  localStorage.setItem("musteriler", JSON.stringify(DB.musteriler));
+  localStorage.setItem("gelir", DB.gelir);
+  localStorage.setItem("kar", DB.kar);
+}
+
+function tabloGuncelle(){
+  // Stok tablosu
+  const stokT = document.getElementById("stokTablo");
+  stokT.innerHTML = "<tr><th>Ürün</th><th>Miktar</th><th>Alış</th><th>İşlem</th></tr>";
+  for(let u in DB.stok){
+    if(DB.stok[u].miktar <=0){ delete DB.stok[u]; continue; }
+    let r = stokT.insertRow();
+    r.insertCell(0).innerText = u;
+    r.insertCell(1).innerText = DB.stok[u].miktar;
+    r.insertCell(2).innerText = DB.stok[u].alim;
+    let btn = document.createElement("button");
+    btn.innerText = "Sil"; btn.className="delete";
+    btn.onclick = ()=>{ delete DB.stok[u]; kaydet(); tabloGuncelle();}
+    r.insertCell(3).appendChild(btn);
+  }
+
+  // Müşteri tablosu
+  const musT = document.getElementById("musteriTablo");
+  musT.innerHTML = "<tr><th>Müşteri</th><th>Borç</th><th>İşlem</th></tr>";
+  let toplamBorc = 0;
+  for(let m in DB.musteriler){
+    toplamBorc += DB.musteriler[m];
+    let r = musT.insertRow();
+    r.insertCell(0).innerText = m;
+    r.insertCell(1).innerText = DB.musteriler[m].toFixed(2);
+    let btn = document.createElement("button");
+    btn.innerText="Sil"; btn.className="delete";
+    btn.onclick = ()=>{ delete DB.musteriler[m]; kaydet(); tabloGuncelle();}
+    r.insertCell(2).appendChild(btn);
+  }
+
+  document.getElementById("gelir").innerText = DB.gelir.toFixed(2);
+  document.getElementById("kar").innerText = DB.kar.toFixed(2);
+  document.getElementById("toplamBorc").innerText = toplamBorc.toFixed(2);
+  kaydet();
+}
+
+// Stok ekle
+function stokEkle(){
+  const u = urun.value.trim();
+  const a = Number(alim.value);
+  const m = Number(miktar.value);
+  if(!u || m<=0 || a<=0) return;
+  if(!DB.stok[u]) DB.stok[u] = {miktar:0, alim:a};
+  DB.stok[u].miktar += m;
+  DB.stok[u].alim = a;
+  tabloGuncelle();
+}
+
+// Müşteri ekle
+function addCustomer(){
+  const m = musteriAdi.value.trim();
+  if(!m) return;
+  if(!DB.musteriler[m]) DB.musteriler[m]=0;
+  tabloGuncelle();
+}
+
+// Borç ekle (+)
+function addDebt(){
+  const m = musteriAdi.value.trim();
+  const b = Number(borcEkle.value);
+  if(!m || isNaN(b) || b<=0) return;
+  DB.musteriler[m] = (DB.musteriler[m] || 0) + b;
+  tabloGuncelle();
+}
+
+// Borç öde (-)
+function payDebt(){
+  const m = musteriAdi.value.trim();
+  const b = Number(odeme.value);
+  if(!m || isNaN(b) || b<=0) return;
+  DB.musteriler[m] = (DB.musteriler[m] || 0) - b;
+  if(DB.musteriler[m]<0) DB.musteriler[m]=0;
+  tabloGuncelle();
+}
+
+// Satış yap
+function satisYap(){
+  const u = sUrun.value.trim();
+  const m = Number(sMiktar.value);
+  const f = Number(sFiyat.value);
+  if(!u || m<=0 || f<=0) return;
+  if(!DB.stok[u] || DB.stok[u].miktar < m){ alert("Stok yetersiz"); return; }
+
+  DB.stok[u].miktar -= m;
+  const kar = (f - DB.stok[u].alim) * m;
+  const tutar = f * m;
+  DB.kar += kar;
+  DB.gelir += tutar;
+
+  tabloGuncelle();
+}
+
+// Reset butonları
+function resetGelir(){ DB.gelir=0; kaydet(); tabloGuncelle(); }
+function resetKar(){ DB.kar=0; kaydet(); tabloGuncelle(); }
+
+tabloGuncelle();
+</script>
+</body>
+</html>
